@@ -1,5 +1,7 @@
 # Minimax with alpha-beta pruning and a hand-crafted valuation function
 
+import time
+
 import numpy as np
 
 from checkers.game import Checkers
@@ -30,27 +32,36 @@ class MinimaxPlayer(Player):
 
     def next_move(self, board, last_moved_piece):
         state = board, self.color, last_moved_piece
+        t0 = time.time()
         max_value, max_move, n_moves = self.max_step(state, 0, set())
-        print('evaluated', n_moves)
+        dt = time.time() - t0
+        print('evaluated %i positions in %.2fs (avg %.2f positions/s)' % (n_moves, dt, n_moves / dt))
         return max_move
 
-    def max_step(self, state, depth, evaluated_states):
-        assert state[1] == self.color, 'Min step should be executed in the player\'s turn.'
+    def max_step(self, state, depth, visited_states):
+        assert state[1] == self.color, 'Max step should be executed in the player\'s turn.'
 
+        im_state = MinimaxPlayer.immutable_state(*state)
+        # Already evaluated?
+        if im_state in self.cached_values:
+            return self.cached_values[im_state], None, 0
+
+        # Evaluate this state
         self.simulator.restore_state(state)
         moves = self.simulator.legal_moves()
         # Base case. Win/loss check
         if len(moves) == 0:
             # No available moves => loss
             print('max', depth, 'end', -1)
+            self.cached_values[im_state] = MinimaxPlayer.loss
             return MinimaxPlayer.loss, None, 1
         # Loop checking for draws
-        im_state = MinimaxPlayer.immutable_state(*state)
-        if im_state in evaluated_states:
+        if im_state in visited_states:
             print('max', depth, 'end', 0)
+            self.cached_values[im_state] = MinimaxPlayer.draw
             return MinimaxPlayer.draw, None, 1
         else:
-            evaluated_states.add(im_state)
+            visited_states.add(im_state)
         # Should we terminate the rollout
         if self.should_stop_rollout(state, depth):
             return self.value(state), None, 1
@@ -64,10 +75,10 @@ class MinimaxPlayer(Player):
             next_state = self.simulator.save_state()
             if next_turn == self.color:
                 # Still our turn
-                value, _, n_moves = self.max_step(next_state, depth=depth + 1, evaluated_states=evaluated_states)
+                value, _, n_moves = self.max_step(next_state, depth=depth + 1, visited_states=visited_states)
             else:
                 # Our adversary's turn
-                value, _, n_moves = self.min_step(next_state, depth=depth + 1, evaluated_states=evaluated_states)
+                value, _, n_moves = self.min_step(next_state, depth=depth + 1, visited_states=visited_states)
             # Update the max_value
             if max_value is None or max_value < value:
                 max_value = value
@@ -76,26 +87,33 @@ class MinimaxPlayer(Player):
             evaluated_moves += n_moves
         return max_value, max_move, evaluated_moves
 
-    def min_step(self, state, depth, evaluated_states):
+    def min_step(self, state, depth, visited_states):
         assert state[1] == self.adversary, 'Min step should be executed in an adversary\'s turn.'
 
+        im_state = MinimaxPlayer.immutable_state(*state)
+        # Already evaluated?
+        if im_state in self.cached_values:
+            return self.cached_values[im_state], None, 0
+
+        # Evaluate this state
         self.simulator.restore_state(state)
         moves = self.simulator.legal_moves()
         # Base case. Win/loss check
         if len(moves) == 0:
             # No available moves for adversary => win
             print('min', depth, 'end', 1)
-            return MinimaxPlayer.win, None, 0
+            self.cached_values[im_state] = MinimaxPlayer.win
+            return MinimaxPlayer.win, None, 1
         # Loop checking for draws
-        im_state = MinimaxPlayer.immutable_state(*state)
-        if im_state in evaluated_states:
+        if im_state in visited_states:
             print('min', depth, 'end', 0)
-            return MinimaxPlayer.draw, None, 0
+            self.cached_values[im_state] = MinimaxPlayer.draw
+            return MinimaxPlayer.draw, None, 1
         else:
-            evaluated_states.add(im_state)
+            visited_states.add(im_state)
         # Should we terminate the rollout
         if self.should_stop_rollout(state, depth):
-            return self.value(state), None, 0
+            return self.value(state), None, 1
         # Rollout each legal move
         min_value, min_move, evaluated_moves = None, None, 0
         for move in self.rollout_order(moves):
@@ -105,10 +123,10 @@ class MinimaxPlayer(Player):
             next_state = self.simulator.save_state()
             if next_turn == self.color:
                 # Still our turn
-                value, _, n_moves = self.max_step(next_state, depth=depth + 1, evaluated_states=evaluated_states)
+                value, _, n_moves = self.max_step(next_state, depth=depth + 1, visited_states=visited_states)
             else:
                 # Our adversary's turn
-                value, _, n_moves = self.min_step(next_state, depth=depth + 1, evaluated_states=evaluated_states)
+                value, _, n_moves = self.min_step(next_state, depth=depth + 1, visited_states=visited_states)
             # Update the min_value
             if min_value is None or value < min_value:
                 min_value = value
@@ -119,6 +137,7 @@ class MinimaxPlayer(Player):
 
 
 if __name__ == '__main__':
+    from checkers.agents.baselines import play_a_game, RandomPlayer
     board = Checkers.empty_board()
     board['black']['men'].update([7, 14])
     board['white']['men'].update([17, 11])
@@ -128,3 +147,8 @@ if __name__ == '__main__':
     move = player.next_move(ch.board, ch.last_moved_piece)
     print(move)
     print(ch.move(*move, skip_check=True))
+
+    # ch = Checkers()
+    # black_player = MinimaxPlayer('black')
+    # white_player = RandomPlayer('white')
+    # play_a_game(ch, black_player.next_move, white_player.next_move)
