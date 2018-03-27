@@ -7,12 +7,10 @@ import numpy as np
 class Checkers:
     '''
     The board is represented by the positions of all pieces of different types belonging to the two players.
+    The game state as the `board`, `turn`, `last_moved_piece`.
     A move is represented by the origin and destination squares by the current player.
     '''
-    BLACK = 0
-    WHITE = 1
-    MAN = 0
-    KING = 1
+    all_players = ['black', 'white']
 
     # Converting to a flat representation of the board
     empty_square = 0
@@ -41,21 +39,24 @@ class Checkers:
         },
     }
 
-    def __init__(self, board=None, turn='black', size=8, empty_corner=True):
+    def __init__(self, board=None, turn='black', last_moved_piece=None, size=8, empty_corner=True):
         '''
         Args:
             empty_corner : bool
                 If the upper left corner of the board should be used. Default to be False.
         '''
         assert size == 8, 'Only supports size 8.'
-        assert turn in ['black', 'white'], 'It must be either `black` or `white`\'s turn'
-        self._board = self.initial_board() if board is None else board
-        self._turn = turn
+        assert turn in Checkers.all_players, 'It must be either `black` or `white`\'s turn'
         self.size = size
         self.empty_corner = empty_corner
         self.n_positions = int(self.size ** 2 // 2)
         self.n_per_row = int(self.size // 2)
-        # self.history = []
+
+        # Game state
+        self._board = board or self.initial_board()
+        self._turn = turn
+        self._last_moved_piece = None
+
         # LUT for the neighboring 4 squares in each directions respectively. None for a missing neighbor
         # XXX there is another way to find neighbors (consider [sq+4, sq+5, sq-4, sq-5])
         self.neighbors = {sq: [] for sq in range(self.n_positions)}
@@ -86,6 +87,20 @@ class Checkers:
         }
         return board
 
+    @staticmethod
+    def empty_board():
+        board = {
+            'black': {
+                'men': set(),
+                'kings': set(),
+            },
+            'white': {
+                'men': set(),
+                'kings': set(),
+            },
+        }
+        return board
+
     @property
     def board(self):
         return self._board
@@ -93,6 +108,10 @@ class Checkers:
     @property
     def turn(self):
         return self._turn
+
+    @property
+    def last_moved_piece(self):
+        return self._last_moved_piece
 
     def move(self, from_sq, to_sq, skip_check=False):
         '''Update the game state after the current player moves its piece from `from_sq` to `to_sq`. Reference: https://en.wikipedia.org/wiki/English_draughts#Rules
@@ -102,7 +121,7 @@ class Checkers:
         '''
         if not skip_check:
             # Reject illegal moves
-            assert (from_sq, to_sq) in self.legal_moves(), 'The move is not legal. You must take a jump.'
+            assert (from_sq, to_sq) in self.legal_moves(), 'The move is not legal.'
 
         # The move is legal
         switch_turn = True
@@ -113,6 +132,7 @@ class Checkers:
                 pieces.remove(from_sq)
                 pieces.add(to_sq)
                 piece_type = type
+                self._last_moved_piece = to_sq
                 break
         else:
             assert False, 'A friendly piece must be moved.'
@@ -131,15 +151,15 @@ class Checkers:
                     break
             else:
                 assert False, 'An opposing piece must be captured.'
-            # Check for new available jumps before crowning a king
-            jumps = self.all_jumps()
+            # Check for new available jumps for the moved piece before crowning a king
+            jumps = self.available_jumps(self._turn, piece_type, to_sq)
             # Switch the turn, if there is no more jumps for the current player
             switch_turn = len(jumps) == 0
 
         # Crowning a king
         if piece_type == 'men':
             # Kings row is at the bottom for black
-            if self._turn == 'black' and self.n_positions - to_sq < self.n_per_row:
+            if self._turn == 'black' and self.n_positions - to_sq <= self.n_per_row:
                 self._board[self._turn]['men'].remove(to_sq)
                 self._board[self._turn]['kings'].add(to_sq)
             # Kings row is at the top for white
@@ -149,6 +169,7 @@ class Checkers:
 
         if switch_turn:
             self._turn = self.adversary
+            self._last_moved_piece = None
 
         # Check win/loss, winner is None before the game ends
         all_next_moves = self.legal_moves()
@@ -156,7 +177,7 @@ class Checkers:
             winner = self.adversary
         else:
             winner = None
-        return self.board, self.turn, all_next_moves, winner
+        return self.board, self.turn, self.last_moved_piece, all_next_moves, winner
 
     @property
     def adversary(self):
@@ -173,7 +194,7 @@ class Checkers:
                     simple_moves.append(next_sq)
         return simple_moves
 
-    def check_occupancy(self, sq, by_players=['black', 'white']):
+    def check_occupancy(self, sq, by_players=all_players):
         '''
         Return : bool
             True if `sq` is occupied.
@@ -203,11 +224,15 @@ class Checkers:
         return jumps
 
     def all_jumps(self):
-        jumps = []
-        for type in ['men', 'kings']:
-            for sq in self._board[self._turn][type]:
-                jumps += itertools.product([sq], self.available_jumps(self._turn, type, sq))
-        return jumps
+        if self._last_moved_piece is None:
+            jumps = []
+            for type in ['men', 'kings']:
+                for sq in self._board[self._turn][type]:
+                    jumps += itertools.product([sq], self.available_jumps(self._turn, type, sq))
+        else:
+            piece_type = 'men' if self._last_moved_piece in self._board[self._turn]['men'] else 'kings'
+            jumps = itertools.product([self._last_moved_piece], self.available_jumps(self._turn, piece_type, self._last_moved_piece))
+        return list(jumps)
 
     def legal_moves(self):
         '''Returns all legal moves of the current `player`.'''
@@ -274,16 +299,38 @@ class Checkers:
                 print(symbols[col], end='')
             print()
 
+    def print_empty_board(self):
+        '''Display the standard representation of the board with squares:
+        __00__01__02__03
+        04__05__06__07__
+        __08__09__10__11
+        12__13__14__15__
+        __16__17__18__19
+        20__21__22__23__
+        __24__25__26__27
+        28__29__30__31__
+        '''
+        board = -1 * np.ones((self.size, self.size), dtype='int')
+        # Print board
+        for sq in range(self.n_positions):
+            board[self.sq2pos(sq)] = sq
+        for row in board:
+            for col in row:
+                print('__' if col < 0 else '%02i' % col, end='')
+            print()
+
     def save_state(self):
-        return copy.deepcopy(self.board), self.turn
+        return copy.deepcopy(self.board), self.turn, self.last_moved_piece
 
     def restore_state(self, state):
-        board, turn = state
+        board, turn, last_moved_piece = state
         self._board = board
         self._turn = turn
+        self._last_moved_piece = last_moved_piece
 
 if __name__ == '__main__':
     ch = Checkers()
+    ch.print_empty_board()
     state = ch.save_state()
     assert ch.sq2pos(31) == (7, 6)
     assert ch.pos2sq(7, 6) == 31
@@ -302,8 +349,9 @@ if __name__ == '__main__':
     ply = 0
     winner = None
     while winner is None:
+        # Select a legal move for the current player
         move = ch.legal_moves()[0]
-        board, turn, moves, winner = ch.move(*move, skip_check=True)
+        board, turn, last_moved_piece, moves, winner = ch.move(*move, skip_check=True)
         ch.print_board()
-        print(ply, turn, winner)
+        print(ply, turn, last_moved_piece, winner)
         ply += 1
