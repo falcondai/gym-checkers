@@ -38,10 +38,11 @@ def play_a_game(checkers, black_player, white_player):
     board, turn, last_moved_piece = checkers.save_state()
     winner = None
     while winner is None:
+        # The current game state
         checkers.print_board()
-        print(ply, turn, last_moved_piece, winner)
-        # Select a legal move for the current player
+        print(ply, turn, last_moved_piece)
         print('legal moves', checkers.legal_moves())
+        # Select a legal move for the current player
         from_sq, to_sq = players[turn](board, last_moved_piece)
         board, turn, last_moved_piece, moves, winner = checkers.move(from_sq, to_sq)
         ply += 1

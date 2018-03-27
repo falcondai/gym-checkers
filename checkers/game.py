@@ -11,6 +11,7 @@ class Checkers:
     A move is represented by the origin and destination squares by the current player.
     '''
     all_players = ['black', 'white']
+    all_piece_types = ['men', 'kings']
 
     # Converting to a flat representation of the board
     empty_square = 0
@@ -324,7 +325,7 @@ class Checkers:
 
     def restore_state(self, state):
         board, turn, last_moved_piece = state
-        self._board = board
+        self._board = copy.deepcopy(board)
         self._turn = turn
         self._last_moved_piece = last_moved_piece
 
