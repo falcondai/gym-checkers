@@ -19,12 +19,12 @@ class RandomPlayer(Player):
 
 
 # Human keyboard player
-def keyboard_player(board, last_moved_piece):
+def keyboard_player_move(board, last_moved_piece):
     '''A player that uses keyboard to select moves.'''
     if last_moved_piece is None:
-        input_str = input('move `from_square, to_square`: ')
+        input_str = input('* move `from_square, to_square`: ')
     else:
-        input_str = input('move `%i, to_square`: ' % last_moved_piece)
+        input_str = input('* move `%i, to_square`: ' % last_moved_piece)
     from_sq, to_sq = map(int, input_str.strip().split(','))
     return from_sq, to_sq
 
@@ -57,4 +57,4 @@ if __name__ == '__main__':
     black_random_player = RandomPlayer('black', seed=0)
     white_random_player = RandomPlayer('white', seed=1)
     play_a_game(ch, black_random_player.next_move, white_random_player.next_move)
-    # play_a_game(ch, keyboard_player, keyboard_player)
+    # play_a_game(ch, keyboard_player_move, keyboard_player_move)
