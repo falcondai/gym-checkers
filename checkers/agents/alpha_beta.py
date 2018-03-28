@@ -11,12 +11,12 @@ from checkers.agents import Player
 class MinimaxPlayer(Player):
     '''Minimax search with alpha-beta pruning'''
     # The value of all the outcomes
-    win, draw, loss = 1, 0, -1
+    win, draw, loss = math.inf, 0, -math.inf
     def __init__(self, color, value_func=None, search_depth=math.inf, rollout_order_gen=None, seed=None):
         super().__init__(color=color, seed=seed)
         self.adversary = 'black' if self.color == 'white' else 'white'
-        # Default to evaluate using piece values
-        self.value = value_func or partial(piece_count_heuristic, self.color, 1, 1)
+        # Default to evaluate using material value heuristic
+        self.value = value_func or partial(material_value, self.color, 1, 1)
         # Default to evaluate actions at a random order
         self.rollout_order = rollout_order_gen or (lambda moves : self.random.permutation(np.asarray(moves, dtype='int,int')))
         # Cache the evaluated values
@@ -47,11 +47,12 @@ class MinimaxPlayer(Player):
             best_move = moves[0]
         else:
             # More than one legal move
-            max_value, best_move = -math.inf, None
-            for move in moves:
+            max_value, best_move = MinimaxPlayer.loss, moves[0]
+            for move in self.rollout_order(moves):
                 self.simulator.restore_state(state)
                 self.simulator.move(*move, skip_check=True)
-                value = self.minimax_search(state, -math.inf, +math.inf, self.search_depth, set())
+                # TODO iterative deepening
+                value = self.minimax_search(state, MinimaxPlayer.loss, MinimaxPlayer.win, self.search_depth, set())
                 if max_value < value:
                     max_value = value
                     best_move = move
@@ -135,11 +136,11 @@ class MinimaxPlayer(Player):
         return extreme_value
 
 
-def piece_count_heuristic(color, king_weight, man_weight, board, turn, last_moved_piece):
-    '''Advantage in the total piece value'''
+def material_value(color, king_weight, man_weight, board, turn, last_moved_piece):
+    '''Heuristic based on advantage in material value'''
     n_black_pieces = man_weight * len(board['black']['men']) + king_weight * len(board['black']['kings'])
     n_white_pieces = man_weight * len(board['white']['men']) + king_weight * len(board['white']['kings'])
-    return (1 if color == 'black' else -1) * (n_black_pieces - n_white_pieces) / max(king_weight, man_weight) / 12
+    return (1 if color == 'black' else -1) * (n_black_pieces - n_white_pieces)
 
 
 if __name__ == '__main__':
@@ -151,17 +152,18 @@ if __name__ == '__main__':
     # ch = Checkers(board=board, turn='white')
     # ch.print_board()
 
-    # player = MinimaxPlayer('white', value_func=partial(piece_count_heuristic, 'white'), depth=1, seed=0)
-    # move = player.next_move(ch.board, ch.last_moved_piece)
-    # print(move)
-    # print(ch.move(*move, skip_check=True))
-
-    ch = Checkers()
-
-    black_player = MinimaxPlayer('black', value_func=partial(piece_count_heuristic, 'black', 2, 1), search_depth=4)
-    # white_player = MinimaxPlayer('white', value_func=partial(piece_count_heuristic, 'white', 2, 1), search_depth=2)
-    white_player = RandomPlayer('white')
-    play_a_game(ch, black_player.next_move, white_player.next_move)
-    # play_a_game(ch, keyboard_player_move, white_player.next_move)
-    print('black player evaluated %i positions in %.2fs (avg %.2f positions/s)' % (black_player.n_evaluated_positions, black_player.evaluation_dt, black_player.n_evaluated_positions / black_player.evaluation_dt))
+    n_wins, n_draws, n_losses = 0, 0, 0
+    for _ in range(20):
+        ch = Checkers()
+        black_player = MinimaxPlayer('black', value_func=partial(material_value, 'black', 2, 1), search_depth=3)
+        # white_player = MinimaxPlayer('white', value_func=partial(material_value, 'white', 2, 1), search_depth=2)
+        white_player = RandomPlayer('white')
+        winner = play_a_game(ch, black_player.next_move, white_player.next_move, 1000)
+        # play_a_game(ch, keyboard_player_move, white_player.next_move)
+        print('black player evaluated %i positions in %.2fs (avg %.2f positions/s)' % (black_player.n_evaluated_positions, black_player.evaluation_dt, black_player.n_evaluated_positions / black_player.evaluation_dt))
+        # Keep scores
+        n_wins += 1 if winner == 'black' else 0
+        n_draws += 1 if winner == None else 0
+        n_losses += 1 if winner == 'white' else 0
+    print('+', n_wins, '=', n_draws, '-', n_losses)
     # print('white player evaluated %i positions in %.2fs (avg %.2f positions/s)' % (white_player.n_evaluated_positions, white_player.evaluation_dt, white_player.n_evaluated_positions / white_player.evaluation_dt))

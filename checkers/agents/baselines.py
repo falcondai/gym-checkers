@@ -1,5 +1,6 @@
 # A few baseline players for Checkers including a keyboard player
 
+import math
 from functools import partial
 
 import numpy as np
@@ -28,7 +29,7 @@ def keyboard_player_move(board, last_moved_piece):
     from_sq, to_sq = map(int, input_str.strip().split(','))
     return from_sq, to_sq
 
-def play_a_game(checkers, black_player, white_player):
+def play_a_game(checkers, black_player, white_player, max_plies=math.inf):
     # Play a quick game
     players = {
         'black': black_player,
@@ -37,7 +38,7 @@ def play_a_game(checkers, black_player, white_player):
     ply = 0
     board, turn, last_moved_piece = checkers.save_state()
     winner = None
-    while winner is None:
+    while winner is None and ply < max_plies:
         # The current game state
         checkers.print_board()
         print(ply, turn, last_moved_piece)

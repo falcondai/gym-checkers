@@ -10,6 +10,7 @@ class Checkers:
     The game state as the `board`, `turn`, `last_moved_piece`.
     A move is represented by the origin and destination squares by the current player.
     '''
+    size = 8
     all_players = ['black', 'white']
     all_piece_types = ['men', 'kings']
 
@@ -40,15 +41,14 @@ class Checkers:
         },
     }
 
-    def __init__(self, board=None, turn='black', last_moved_piece=None, size=8, empty_corner=True):
+    def __init__(self, board=None, turn='black', last_moved_piece=None, empty_corner=True):
         '''
         Args:
             empty_corner : bool
                 If the upper left corner of the board should be used. Default to be False.
         '''
-        assert size == 8, 'Only supports size 8.'
+        # assert size == 8, 'Only supports size 8.'
         assert turn in Checkers.all_players, 'It must be either `black` or `white`\'s turn'
-        self.size = size
         self.empty_corner = empty_corner
         self.n_positions = int(self.size ** 2 // 2)
         self.n_per_row = int(self.size // 2)
@@ -73,7 +73,7 @@ class Checkers:
                     self.neighbors[sq].append(self.pos2sq(next_row, next_col))
 
     @staticmethod
-    def initial_board(size=8):
+    def initial_board():
         '''Returns the initial configuration of the board'''
         # Black starts at the top of the board
         board = {
@@ -289,15 +289,20 @@ class Checkers:
     def print_board(self):
         # Symbols
         empty_square = '_'
+        empty_playable_square = '.'
         black_man = 'b'
         black_king = 'B'
         white_man = 'w'
         white_king = 'W'
-        symbols = [empty_square, black_man, black_king, white_man, white_king]
+        symbols = [empty_playable_square, black_man, black_king, white_man, white_king]
         # Print board
-        for row in self.flat_board():
-            for col in row:
-                print(symbols[col], end='')
+        for i, row in enumerate(self.flat_board()):
+            for j, col in enumerate(row):
+                if ((i + self.empty_corner) % 2 + j) % 2 == 1:
+                    # Not playable squares
+                    print(empty_square, end='')
+                else:
+                    print(symbols[col], end='')
             print()
 
     def print_empty_board(self):
@@ -330,7 +335,7 @@ class Checkers:
         self._last_moved_piece = last_moved_piece
 
 if __name__ == '__main__':
-    ch = Checkers()
+    ch = Checkers(empty_corner=True)
     ch.print_empty_board()
     state = ch.save_state()
     assert ch.sq2pos(31) == (7, 6)
