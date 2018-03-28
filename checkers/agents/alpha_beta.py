@@ -1,6 +1,7 @@
 # Minimax with alpha-beta pruning and a hand-crafted valuation function
 
-import time
+import time, math
+from functools import partial
 
 import numpy as np
 
@@ -11,16 +12,18 @@ class MinimaxPlayer(Player):
     '''Minimax search with alpha-beta pruning'''
     # The value of all the outcomes
     win, draw, loss = 1, 0, -1
-    def __init__(self, color, value_func=None, terminate_rollout_func=None, rollout_order_gen=None, seed=None):
+    def __init__(self, color, value_func=None, search_depth=math.inf, rollout_order_gen=None, seed=None):
         super().__init__(color=color, seed=seed)
         self.adversary = 'black' if self.color == 'white' else 'white'
-        self.value = value_func
-        # Default to rollout till the end
-        self.should_stop_rollout = terminate_rollout_func or (lambda state, depth : False)
+        # Default to evaluate using piece values
+        self.value = value_func or partial(piece_count_heuristic, self.color, 1, 1)
         # Default to evaluate actions at a random order
         self.rollout_order = rollout_order_gen or (lambda moves : self.random.permutation(np.asarray(moves, dtype='int,int')))
         # Cache the evaluated values
         self.cached_values = {}
+        self.search_depth = search_depth
+        self.n_evaluated_positions = 0
+        self.evaluation_dt = 0
 
     @staticmethod
     def immutable_state(board, turn, last_moved_piece):
@@ -30,21 +33,43 @@ class MinimaxPlayer(Player):
                 pieces.append(frozenset(board[player][piece_type]))
         return tuple(pieces), turn, last_moved_piece
 
+    def add_to_cache(self, immutable_state, value):
+        # TODO evict some cache to prevent over-capacity
+        self.cached_values[immutable_state] = value
+
     def next_move(self, board, last_moved_piece):
         state = board, self.color, last_moved_piece
         t0 = time.time()
-        max_value, max_move, n_moves = self.max_step(state, 0, set())
+        self.simulator.restore_state(state)
+        moves = self.simulator.legal_moves()
+        if len(moves) == 1:
+            # No other choice
+            best_move = moves[0]
+        else:
+            # More than one legal move
+            max_value, best_move = -math.inf, None
+            for move in moves:
+                self.simulator.restore_state(state)
+                self.simulator.move(*move, skip_check=True)
+                value = self.minimax_search(state, -math.inf, +math.inf, self.search_depth, set())
+                if max_value < value:
+                    max_value = value
+                    best_move = move
         dt = time.time() - t0
-        print('evaluated %i positions in %.2fs (avg %.2f positions/s)' % (n_moves, dt, n_moves / dt))
-        return max_move
+        self.evaluation_dt += dt
+        return best_move
 
-    def max_step(self, state, depth, visited_states):
-        assert state[1] == self.color, 'Max step should be executed in the player\'s turn.'
-
+    def minimax_search(self, state, alpha, beta, depth, visited_states):
+        # TODO use a stack for depth-first search?
+        # XXX visited_states should only track a path?
+        '''Bounded depth first minimax search with alpha-beta pruning'''
+        board, turn, last_moved_piece = state
         im_state = MinimaxPlayer.immutable_state(*state)
+
         # Already evaluated?
         if im_state in self.cached_values:
-            return self.cached_values[im_state], None, 0
+            # print('cache hit')
+            self.cached_values[im_state]
 
         # Evaluate this state
         self.simulator.restore_state(state)
@@ -52,103 +77,91 @@ class MinimaxPlayer(Player):
         # Base case. Win/loss check
         if len(moves) == 0:
             # No available moves => loss
-            print('max', depth, 'end', -1)
-            self.cached_values[im_state] = MinimaxPlayer.loss
-            return MinimaxPlayer.loss, None, 1
-        # Loop checking for draws
-        if im_state in visited_states:
-            print('max', depth, 'end', 0)
-            self.cached_values[im_state] = MinimaxPlayer.draw
-            return MinimaxPlayer.draw, None, 1
-        else:
-            visited_states.add(im_state)
-        # Should we terminate the rollout
-        if self.should_stop_rollout(state, depth):
-            return self.value(state), None, 1
+            value = MinimaxPlayer.loss if turn == self.color else MinimaxPlayer.win
+            self.add_to_cache(im_state, value)
+            # print(self.color == turn, depth, 'end', value)
+            self.n_evaluated_positions += 1
+            return value
+        # # Loop checking for draws
+        # if im_state in visited_states:
+        #     # print(self.color == turn, depth, 'end', 0)
+        #     value = MinimaxPlayer.draw
+        #     self.add_to_cache(im_state, value)
+        #     self.n_evaluated_positions += 1
+        #     return value
+        # else:
+        #     visited_states.add(im_state)
+
+        # We should terminate the rollout early
+        if depth == 0:
+            # Terminate with a valuation function
+            value = self.value(*state)
+            # print(self.color == turn, depth, 'end', value)
+            self.n_evaluated_positions += 1
+            return value
         # Rollout each legal move
-        max_value, max_move, evaluated_moves = None, None, 0
-        for move in self.rollout_order(moves):
-            print('max', depth, move, state[0])
-            self.simulator.restore_state(state)
-            self.simulator.print_board()
-            next_board, next_turn, next_last_moved_piece, next_moves, winner = self.simulator.move(*move, skip_check=True)
-            next_state = self.simulator.save_state()
-            if next_turn == self.color:
-                # Still our turn
-                value, _, n_moves = self.max_step(next_state, depth=depth + 1, visited_states=visited_states)
-            else:
-                # Our adversary's turn
-                value, _, n_moves = self.min_step(next_state, depth=depth + 1, visited_states=visited_states)
-            # Update the max_value
-            if max_value is None or max_value < value:
-                max_value = value
-                max_move = move
-            # Update statistics
-            evaluated_moves += n_moves
-        return max_value, max_move, evaluated_moves
-
-    def min_step(self, state, depth, visited_states):
-        assert state[1] == self.adversary, 'Min step should be executed in an adversary\'s turn.'
-
-        im_state = MinimaxPlayer.immutable_state(*state)
-        # Already evaluated?
-        if im_state in self.cached_values:
-            return self.cached_values[im_state], None, 0
-
-        # Evaluate this state
-        self.simulator.restore_state(state)
-        moves = self.simulator.legal_moves()
-        # Base case. Win/loss check
-        if len(moves) == 0:
-            # No available moves for adversary => win
-            print('min', depth, 'end', 1)
-            self.cached_values[im_state] = MinimaxPlayer.win
-            return MinimaxPlayer.win, None, 1
-        # Loop checking for draws
-        if im_state in visited_states:
-            print('min', depth, 'end', 0)
-            self.cached_values[im_state] = MinimaxPlayer.draw
-            return MinimaxPlayer.draw, None, 1
+        if turn == self.color:
+            # Maximizing node
+            extreme_value = alpha
+            for move in self.rollout_order(moves):
+                # print(self.color == turn, depth, move, state[0])
+                self.simulator.restore_state(state)
+                # self.simulator.print_board()
+                next_board, next_turn, next_last_moved_piece, next_moves, winner = self.simulator.move(*move, skip_check=True)
+                next_state = self.simulator.save_state()
+                # Evaluate the next position
+                value = self.minimax_search(next_state, extreme_value, beta, depth=depth-1, visited_states=visited_states)
+                # Update the max value
+                extreme_value = max(value, extreme_value)
+                if beta < extreme_value:
+                    # Prune the rest of children nodes
+                    return beta
         else:
-            visited_states.add(im_state)
-        # Should we terminate the rollout
-        if self.should_stop_rollout(state, depth):
-            return self.value(state), None, 1
-        # Rollout each legal move
-        min_value, min_move, evaluated_moves = None, None, 0
-        for move in self.rollout_order(moves):
-            print('min', depth, move)
-            self.simulator.restore_state(state)
-            next_board, next_turn, next_last_moved_piece, next_moves, winner = self.simulator.move(*move, skip_check=True)
-            next_state = self.simulator.save_state()
-            if next_turn == self.color:
-                # Still our turn
-                value, _, n_moves = self.max_step(next_state, depth=depth + 1, visited_states=visited_states)
-            else:
-                # Our adversary's turn
-                value, _, n_moves = self.min_step(next_state, depth=depth + 1, visited_states=visited_states)
-            # Update the min_value
-            if min_value is None or value < min_value:
-                min_value = value
-                min_move = move
-            # Update statistics
-            evaluated_moves += n_moves
-        return min_value, min_move, evaluated_moves
+            # Minimizing node
+            extreme_value = beta
+            for move in self.rollout_order(moves):
+                # print(self.color == turn, depth, move, state[0])
+                self.simulator.restore_state(state)
+                # self.simulator.print_board()
+                next_board, next_turn, next_last_moved_piece, next_moves, winner = self.simulator.move(*move, skip_check=True)
+                next_state = self.simulator.save_state()
+                # Evaluate the next position
+                value = self.minimax_search(next_state, alpha, extreme_value, depth=depth-1, visited_states=visited_states)
+                # Update the min value
+                extreme_value = min(value, extreme_value)
+                if extreme_value < alpha:
+                    # Prune the rest of children nodes
+                    return alpha
+        return extreme_value
+
+
+def piece_count_heuristic(color, king_weight, man_weight, board, turn, last_moved_piece):
+    '''Advantage in the total piece value'''
+    n_black_pieces = man_weight * len(board['black']['men']) + king_weight * len(board['black']['kings'])
+    n_white_pieces = man_weight * len(board['white']['men']) + king_weight * len(board['white']['kings'])
+    return (1 if color == 'black' else -1) * (n_black_pieces - n_white_pieces) / max(king_weight, man_weight) / 12
 
 
 if __name__ == '__main__':
-    from checkers.agents.baselines import play_a_game, RandomPlayer
-    board = Checkers.empty_board()
-    board['black']['men'].update([7, 14])
-    board['white']['men'].update([17, 11])
-    ch = Checkers(board=board, turn='white')
-    ch.print_board()
-    player = MinimaxPlayer('white')
-    move = player.next_move(ch.board, ch.last_moved_piece)
-    print(move)
-    print(ch.move(*move, skip_check=True))
+    from checkers.agents.baselines import play_a_game, RandomPlayer, keyboard_player_move
 
-    # ch = Checkers()
-    # black_player = MinimaxPlayer('black')
-    # white_player = RandomPlayer('white')
-    # play_a_game(ch, black_player.next_move, white_player.next_move)
+    # board = Checkers.empty_board()
+    # board['black']['men'].update([7, 14])
+    # board['white']['men'].update([17, 11])
+    # ch = Checkers(board=board, turn='white')
+    # ch.print_board()
+
+    # player = MinimaxPlayer('white', value_func=partial(piece_count_heuristic, 'white'), depth=1, seed=0)
+    # move = player.next_move(ch.board, ch.last_moved_piece)
+    # print(move)
+    # print(ch.move(*move, skip_check=True))
+
+    ch = Checkers()
+
+    black_player = MinimaxPlayer('black', value_func=partial(piece_count_heuristic, 'black', 2, 1), search_depth=4)
+    # white_player = MinimaxPlayer('white', value_func=partial(piece_count_heuristic, 'white', 2, 1), search_depth=2)
+    white_player = RandomPlayer('white')
+    play_a_game(ch, black_player.next_move, white_player.next_move)
+    # play_a_game(ch, keyboard_player_move, white_player.next_move)
+    print('black player evaluated %i positions in %.2fs (avg %.2f positions/s)' % (black_player.n_evaluated_positions, black_player.evaluation_dt, black_player.n_evaluated_positions / black_player.evaluation_dt))
+    # print('white player evaluated %i positions in %.2fs (avg %.2f positions/s)' % (white_player.n_evaluated_positions, white_player.evaluation_dt, white_player.n_evaluated_positions / white_player.evaluation_dt))
