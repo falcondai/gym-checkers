@@ -45,6 +45,8 @@ def play_a_game(checkers, black_player, white_player, max_plies=math.inf):
         print('legal moves', checkers.legal_moves())
         # Select a legal move for the current player
         from_sq, to_sq = players[turn](board, last_moved_piece)
+        print(turn, 'moved %i, %i' % (from_sq, to_sq))
+        print()
         board, turn, last_moved_piece, moves, winner = checkers.move(from_sq, to_sq)
         ply += 1
     print(winner, 'wins')
@@ -57,5 +59,6 @@ if __name__ == '__main__':
 
     black_random_player = RandomPlayer('black', seed=0)
     white_random_player = RandomPlayer('white', seed=1)
-    play_a_game(ch, black_random_player.next_move, white_random_player.next_move)
+    # play_a_game(ch, black_random_player.next_move, white_random_player.next_move)
     # play_a_game(ch, keyboard_player_move, keyboard_player_move)
+    play_a_game(ch, keyboard_player_move, white_random_player.next_move)

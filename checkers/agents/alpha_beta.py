@@ -51,8 +51,10 @@ class MinimaxPlayer(Player):
             for move in self.rollout_order(moves):
                 self.simulator.restore_state(state)
                 self.simulator.move(*move, skip_check=True)
+                next_state = self.simulator.save_state()
                 # TODO iterative deepening
-                value = self.minimax_search(state, MinimaxPlayer.loss, MinimaxPlayer.win, self.search_depth, set())
+                value = self.minimax_search(next_state, MinimaxPlayer.loss, MinimaxPlayer.win, self.search_depth, set())
+                # print('move', move, 'value', value)
                 if max_value < value:
                     max_value = value
                     best_move = move
@@ -64,6 +66,7 @@ class MinimaxPlayer(Player):
         # TODO use a stack for depth-first search?
         # XXX visited_states should only track a path?
         '''Bounded depth first minimax search with alpha-beta pruning'''
+        # print(depth, state[1], state[0])
         board, turn, last_moved_piece = state
         im_state = MinimaxPlayer.immutable_state(*state)
 
@@ -80,7 +83,7 @@ class MinimaxPlayer(Player):
             # No available moves => loss
             value = MinimaxPlayer.loss if turn == self.color else MinimaxPlayer.win
             self.add_to_cache(im_state, value)
-            # print(self.color == turn, depth, 'end', value)
+            # print(self.color == turn, depth, 'end', value, 'no more moves')
             self.n_evaluated_positions += 1
             return value
         # # Loop checking for draws
@@ -107,8 +110,8 @@ class MinimaxPlayer(Player):
             for move in self.rollout_order(moves):
                 # print(self.color == turn, depth, move, state[0])
                 self.simulator.restore_state(state)
-                # self.simulator.print_board()
                 next_board, next_turn, next_last_moved_piece, next_moves, winner = self.simulator.move(*move, skip_check=True)
+                # print(self.color == turn, depth, move, next_board)
                 next_state = self.simulator.save_state()
                 # Evaluate the next position
                 value = self.minimax_search(next_state, extreme_value, beta, depth=depth-1, visited_states=visited_states)
@@ -121,10 +124,9 @@ class MinimaxPlayer(Player):
             # Minimizing node
             extreme_value = beta
             for move in self.rollout_order(moves):
-                # print(self.color == turn, depth, move, state[0])
                 self.simulator.restore_state(state)
-                # self.simulator.print_board()
                 next_board, next_turn, next_last_moved_piece, next_moves, winner = self.simulator.move(*move, skip_check=True)
+                # print(self.color == turn, depth, move, next_board)
                 next_state = self.simulator.save_state()
                 # Evaluate the next position
                 value = self.minimax_search(next_state, alpha, extreme_value, depth=depth-1, visited_states=visited_states)
@@ -146,24 +148,20 @@ def material_value(color, king_weight, man_weight, board, turn, last_moved_piece
 if __name__ == '__main__':
     from checkers.agents.baselines import play_a_game, RandomPlayer, keyboard_player_move
 
-    # board = Checkers.empty_board()
-    # board['black']['men'].update([7, 14])
-    # board['white']['men'].update([17, 11])
-    # ch = Checkers(board=board, turn='white')
-    # ch.print_board()
-
+    # A few matches against a random player
     n_wins, n_draws, n_losses = 0, 0, 0
-    for _ in range(20):
+    for i in range(20):
+        print('game', i)
         ch = Checkers()
         black_player = MinimaxPlayer('black', value_func=partial(material_value, 'black', 2, 1), search_depth=3)
-        # white_player = MinimaxPlayer('white', value_func=partial(material_value, 'white', 2, 1), search_depth=2)
-        white_player = RandomPlayer('white')
-        winner = play_a_game(ch, black_player.next_move, white_player.next_move, 1000)
+        white_player = MinimaxPlayer('white', value_func=partial(material_value, 'white', 2, 1), search_depth=2)
+        # white_player = RandomPlayer('white')
+        winner = play_a_game(ch, black_player.next_move, white_player.next_move, 200)
         # play_a_game(ch, keyboard_player_move, white_player.next_move)
         print('black player evaluated %i positions in %.2fs (avg %.2f positions/s)' % (black_player.n_evaluated_positions, black_player.evaluation_dt, black_player.n_evaluated_positions / black_player.evaluation_dt))
+        print()
         # Keep scores
         n_wins += 1 if winner == 'black' else 0
         n_draws += 1 if winner == None else 0
         n_losses += 1 if winner == 'white' else 0
     print('+', n_wins, '=', n_draws, '-', n_losses)
-    # print('white player evaluated %i positions in %.2fs (avg %.2f positions/s)' % (white_player.n_evaluated_positions, white_player.evaluation_dt, white_player.n_evaluated_positions / white_player.evaluation_dt))
