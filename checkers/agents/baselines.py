@@ -29,27 +29,35 @@ def keyboard_player_move(board, last_moved_piece):
     from_sq, to_sq = map(int, input_str.strip().split(','))
     return from_sq, to_sq
 
-def play_a_game(checkers, black_player, white_player, max_plies=math.inf):
+def play_a_game(checkers, black_player_move, white_player_move, max_plies=math.inf):
     # Play a quick game
     players = {
-        'black': black_player,
-        'white': white_player,
+        'black': black_player_move,
+        'white': white_player_move,
     }
     ply = 0
+    tot_moves = 0
     board, turn, last_moved_piece = checkers.save_state()
+    moves = checkers.legal_moves()
     winner = None
     while winner is None and ply < max_plies:
+        tot_moves += len(moves)
         # The current game state
         checkers.print_board()
         print(ply, turn, last_moved_piece)
-        print('legal moves', checkers.legal_moves())
+        print('legal moves', moves)
         # Select a legal move for the current player
         from_sq, to_sq = players[turn](board, last_moved_piece)
         print(turn, 'moved %i, %i' % (from_sq, to_sq))
         print()
+        # Update the game
         board, turn, last_moved_piece, moves, winner = checkers.move(from_sq, to_sq)
         ply += 1
-    print(winner, 'wins')
+    if winner is None:
+        print('draw')
+    else:
+        print(winner, 'wins')
+    print('total legal moves', tot_moves, 'avg branching factor', tot_moves / ply)
     return winner
 
 
@@ -59,6 +67,5 @@ if __name__ == '__main__':
 
     black_random_player = RandomPlayer('black', seed=0)
     white_random_player = RandomPlayer('white', seed=1)
-    # play_a_game(ch, black_random_player.next_move, white_random_player.next_move)
+    play_a_game(ch, black_random_player.next_move, white_random_player.next_move)
     # play_a_game(ch, keyboard_player_move, keyboard_player_move)
-    play_a_game(ch, keyboard_player_move, white_random_player.next_move)

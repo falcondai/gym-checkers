@@ -6,6 +6,8 @@ from checkers.game import Checkers
 class Player:
     '''An abstract player.'''
     def __init__(self, color, seed=None):
+        assert color in Checkers.all_players, '`color` must be in %r.' % Checkers.all_players
+        
         # Which side is being played
         self.color = color
         # Internal simulator for rollouts
