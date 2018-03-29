@@ -1,14 +1,14 @@
 from checkers.game import Checkers
 
 def test_multi_jump():
-    # ___b____
-    # __w_____
-    # ________
-    # __w_____
-    # ________
-    # __w_____
-    # ________
-    # ________
+    # _._b_._.
+    # ._w_._._
+    # _._._._.
+    # ._w_._._
+    # _._._._.
+    # ._w_._._
+    # _._._._.
+    # ._._._._
     board = Checkers.empty_board()
     board['black']['men'].add(1)
     board['white']['men'].update([5, 5 + 4 * 2, 5 + 4 * 4])
@@ -19,20 +19,19 @@ def test_multi_jump():
     assert ch.turn == 'black', 'Black still have more jumps so it is Black\'s turn.'
 
 def test_single_piece_moved():
-    '''Only one piece is allowed to move within one's turn'''
-    # _b______
-    # __w_b___
-    # _____w__
-    # ____w___
-    # ________
-    # ________
-    # ________
-    # ________
+    '''Only one piece is allowed to move within one s turn'''
+    # _b_._._.
+    # ._w_b_._
+    # _._._w_.
+    # ._._w_._
+    # _._._._.
+    # ._._._._
+    # _._._._.
+    # ._._._._
     board = Checkers.empty_board()
     board['black']['men'].update([0, 6])
     board['white']['men'].update([5, 5 + 5, 14])
     ch = Checkers(board=board)
-    ch.print_board()
     state = ch.save_state()
     ch.move(0, 9)
     assert ch.turn == 'black' and ch.last_moved_piece == 9, 'Black still have more jumps.'
