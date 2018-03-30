@@ -1,6 +1,9 @@
 # Minimax with alpha-beta pruning and a hand-crafted valuation function
+from __future__ import absolute_import, division, print_function
+from six.moves import range
 
-import time, math
+
+import time
 from functools import partial
 from collections import defaultdict
 
@@ -12,9 +15,9 @@ from checkers.agents import Player
 class MinimaxPlayer(Player):
     '''Minimax search with alpha-beta pruning'''
     # The value of all the outcomes
-    win, draw, loss = math.inf, 0, -math.inf
-    def __init__(self, color, value_func=None, search_depth=math.inf, rollout_order_gen=None, seed=None):
-        super().__init__(color=color, seed=seed)
+    win, draw, loss = float('inf'), 0, float('-inf')
+    def __init__(self, color, value_func=None, search_depth=float('inf'), rollout_order_gen=None, seed=None):
+        super(MinimaxPlayer, self).__init__(color=color, seed=seed)
 
         # Search depth = 0 is a random player
         assert 0 < search_depth, '`search_depth` must be greater than 0.'

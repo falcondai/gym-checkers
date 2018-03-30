@@ -1,6 +1,8 @@
 # A few baseline players for Checkers including a keyboard player
+from __future__ import absolute_import, division, print_function
+from six.moves import range
 
-import math
+
 from functools import partial
 
 import numpy as np
@@ -29,7 +31,7 @@ def keyboard_player_move(board, last_moved_piece):
     from_sq, to_sq = map(int, input_str.strip().split(','))
     return from_sq, to_sq
 
-def play_a_game(checkers, black_player_move, white_player_move, max_plies=math.inf):
+def play_a_game(checkers, black_player_move, white_player_move, max_plies=float('inf')):
     # Play a quick game
     players = {
         'black': black_player_move,

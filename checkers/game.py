@@ -1,5 +1,9 @@
 # Game logic for checkers
 
+from __future__ import absolute_import, division, print_function
+from six.moves import range
+
+
 import itertools, copy
 import numpy as np
 
