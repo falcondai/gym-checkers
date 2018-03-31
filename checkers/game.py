@@ -26,10 +26,6 @@ class Checkers:
     white_king = 4
 
     # Directions
-    # sw = 0
-    # se = 1
-    # ne = 2
-    # nw = 3
     pos2dir = ['sw', 'se', 'ne', 'nw']
     dir2del = [(+1, -1), (+1, +1), (-1, +1), (-1, -1)]
 
@@ -105,6 +101,19 @@ class Checkers:
             },
         }
         return board
+
+    @staticmethod
+    def immutable_board(board):
+        # TODO Bitboard representation?
+        pieces = []
+        for player in Checkers.all_players:
+            for piece_type in Checkers.all_piece_types:
+                pieces.append(frozenset(board[player][piece_type]))
+        return tuple(pieces)
+
+    @staticmethod
+    def board_equal(board1, board2):
+        return Checkers.immutable_board(board1) == Checkers.immutable_board(board2)
 
     @property
     def board(self):

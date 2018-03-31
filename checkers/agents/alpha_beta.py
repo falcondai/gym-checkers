@@ -42,11 +42,7 @@ class MinimaxPlayer(Player):
 
     @staticmethod
     def immutable_state(board, turn, last_moved_piece):
-        pieces = []
-        for player in Checkers.all_players:
-            for piece_type in Checkers.all_piece_types:
-                pieces.append(frozenset(board[player][piece_type]))
-        return tuple(pieces), turn, last_moved_piece
+        return Checkers.immutable_board(board), turn, last_moved_piece
 
     def add_to_cache(self, immutable_state, value):
         # TODO evict some cache to prevent over-capacity

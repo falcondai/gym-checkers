@@ -1,6 +1,7 @@
 from checkers.game import Checkers
 
 def test_multi_jump():
+    '''Handling a multi-jump'''
     # _._b_._.
     # ._w_._._
     # _._._._.

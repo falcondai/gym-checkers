@@ -2,6 +2,7 @@ from checkers.game import Checkers
 from checkers.agents.alpha_beta import MinimaxPlayer
 
 def test_opposing_duo():
+    '''A sanity test for a look-ahead agent'''
     # _._._._.
     # ._._._._
     # _._._._.
