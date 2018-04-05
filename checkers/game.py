@@ -15,6 +15,10 @@ class Checkers:
     A move is represented by the origin and destination squares by the current player.
     '''
     size = 8
+    n_positions = int(size ** 2 // 2)
+    n_per_row = int(size // 2)
+
+    # TODO change players to top/bottom players
     all_players = ['black', 'white']
     all_piece_types = ['men', 'kings']
 
@@ -50,8 +54,6 @@ class Checkers:
         # assert size == 8, 'Only supports size 8.'
         assert turn in Checkers.all_players, 'It must be either `black` or `white`\'s turn'
         self.empty_corner = empty_corner
-        self.n_positions = int(self.size ** 2 // 2)
-        self.n_per_row = int(self.size // 2)
 
         # Game state
         self._board = board or self.initial_board()
