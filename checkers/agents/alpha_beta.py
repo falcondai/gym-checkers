@@ -40,6 +40,9 @@ class MinimaxPlayer(Player):
         self.evaluation_dt = 0
         self.prunes = defaultdict(lambda : 0)
 
+        # Visualization
+        self.last_move_values = {}
+
     @staticmethod
     def immutable_state(board, turn, last_moved_piece):
         return Checkers.immutable_board(board), turn, last_moved_piece
@@ -57,15 +60,17 @@ class MinimaxPlayer(Player):
         if len(moves) == 1:
             # No other choice
             best_move = moves[0]
+            mvs = {moves[0]: 0}
         else:
             # More than one legal move
-            value, best_move = self.minimax_search(state, MinimaxPlayer.loss, MinimaxPlayer.win, self.search_depth, set())
+            value, best_move, mvs = self.minimax_search(state, MinimaxPlayer.loss, MinimaxPlayer.win, self.search_depth, set())
             # print('move', move, 'value', value)
         dt = time.time() - t0
         dm = self.n_evaluated_positions - m0
         print('evaluated %i positions in %.2fs (avg %.2f positions/s) with effective branching factor %.2f' % (dm, dt, dm / dt, dm ** (1 / self.search_depth)))
         self.evaluation_dt += dt
         self.ply += 1
+        self.last_move_values = mvs
         return best_move
 
     def minimax_search(self, state, alpha, beta, depth, visited_states):
@@ -93,7 +98,7 @@ class MinimaxPlayer(Player):
             self.add_to_cache(im_state, value)
             # print(self.color == turn, depth, 'end', value, 'no more moves')
             self.n_evaluated_positions += 1
-            return value, None
+            return value, None, {}
 
         # # Loop checking for draws
         # if im_state in visited_states:
@@ -113,9 +118,10 @@ class MinimaxPlayer(Player):
             value = self.value(*state)
             # print(self.color == turn, depth, 'end', value)
             self.n_evaluated_positions += 1
-            return value, ordered_moves[0]
+            return value, ordered_moves[0], {}
         # Rollout each legal move
         best_move = ordered_moves[0]
+        move_values = {}
         if turn == self.color:
             # Maximizing node
             extreme_value = alpha
@@ -126,7 +132,11 @@ class MinimaxPlayer(Player):
                 # print(self.color == turn, depth, move, next_board)
                 next_state = self.simulator.save_state()
                 # Evaluate the next position
-                value, _ = self.minimax_search(next_state, extreme_value, beta, depth=depth-1, visited_states=visited_states)
+                value, _, _ = self.minimax_search(next_state, extreme_value, beta, depth=depth-1, visited_states=visited_states)
+                # Viz
+                fr, to = move
+                fr, to = int(fr), int(to)
+                move_values[fr, to] = value
                 # Update the max value
                 if extreme_value < value:
                     extreme_value = value
@@ -135,7 +145,7 @@ class MinimaxPlayer(Player):
                     # Prune the rest of children nodes, beta cutoff
                     # print('prune', 'beta-cutoff', depth)
                     self.prunes['beta', depth] += 1
-                    return beta, best_move
+                    return beta, best_move, move_values
         else:
             # Minimizing node
             extreme_value = beta
@@ -145,7 +155,11 @@ class MinimaxPlayer(Player):
                 # print(self.color == turn, depth, move, next_board)
                 next_state = self.simulator.save_state()
                 # Evaluate the next position
-                value, _ = self.minimax_search(next_state, alpha, extreme_value, depth=depth-1, visited_states=visited_states)
+                value, _, _ = self.minimax_search(next_state, alpha, extreme_value, depth=depth-1, visited_states=visited_states)
+                # Viz
+                fr, to = move
+                fr, to = int(fr), int(to)
+                move_values[fr, to] = value
                 # Update the min value
                 if value < extreme_value:
                     extreme_value = value
@@ -154,8 +168,8 @@ class MinimaxPlayer(Player):
                     # Prune the rest of children nodes, alpha cutoff
                     # print('prune', 'alpha-cutoff', depth)
                     self.prunes['alpha', depth] += 1
-                    return alpha, best_move
-        return extreme_value, best_move
+                    return alpha, best_move, move_values
+        return extreme_value, best_move, move_values
 
 
 def material_value(king_value, man_value, pieces):
