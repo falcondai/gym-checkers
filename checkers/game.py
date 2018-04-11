@@ -15,6 +15,10 @@ class Checkers:
     A move is represented by the origin and destination squares by the current player.
     '''
     size = 8
+    n_positions = int(size ** 2 // 2)
+    n_per_row = int(size // 2)
+
+    # TODO change players to top/bottom players
     all_players = ['black', 'white']
     all_piece_types = ['men', 'kings']
 
@@ -26,10 +30,6 @@ class Checkers:
     white_king = 4
 
     # Directions
-    # sw = 0
-    # se = 1
-    # ne = 2
-    # nw = 3
     pos2dir = ['sw', 'se', 'ne', 'nw']
     dir2del = [(+1, -1), (+1, +1), (-1, +1), (-1, -1)]
 
@@ -54,8 +54,6 @@ class Checkers:
         # assert size == 8, 'Only supports size 8.'
         assert turn in Checkers.all_players, 'It must be either `black` or `white`\'s turn'
         self.empty_corner = empty_corner
-        self.n_positions = int(self.size ** 2 // 2)
-        self.n_per_row = int(self.size // 2)
 
         # Game state
         self._board = board or self.initial_board()
@@ -105,6 +103,19 @@ class Checkers:
             },
         }
         return board
+
+    @staticmethod
+    def immutable_board(board):
+        # TODO Bitboard representation?
+        pieces = []
+        for player in Checkers.all_players:
+            for piece_type in Checkers.all_piece_types:
+                pieces.append(frozenset(board[player][piece_type]))
+        return tuple(pieces)
+
+    @staticmethod
+    def board_equal(board1, board2):
+        return Checkers.immutable_board(board1) == Checkers.immutable_board(board2)
 
     @property
     def board(self):

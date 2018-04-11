@@ -14,6 +14,8 @@ from checkers.agents import Player
 
 class MinimaxPlayer(Player):
     '''Minimax search with alpha-beta pruning'''
+    # TODO killer move heuristic
+    # TODO history heuristic
     # The value of all the outcomes
     win, draw, loss = float('inf'), 0, float('-inf')
     def __init__(self, color, value_func=None, search_depth=float('inf'), rollout_order_gen=None, seed=None):
@@ -40,11 +42,7 @@ class MinimaxPlayer(Player):
 
     @staticmethod
     def immutable_state(board, turn, last_moved_piece):
-        pieces = []
-        for player in Checkers.all_players:
-            for piece_type in Checkers.all_piece_types:
-                pieces.append(frozenset(board[player][piece_type]))
-        return tuple(pieces), turn, last_moved_piece
+        return Checkers.immutable_board(board), turn, last_moved_piece
 
     def add_to_cache(self, immutable_state, value):
         # TODO evict some cache to prevent over-capacity
@@ -71,8 +69,10 @@ class MinimaxPlayer(Player):
         return best_move
 
     def minimax_search(self, state, alpha, beta, depth, visited_states):
-        '''Bounded depth first minimax search with alpha-beta pruning'''
-        # TODO use a stack for depth-first search?
+        '''
+        Bounded depth first minimax search with alpha-beta pruning.
+        Suppose that we can evaluate k positions per second, then in m seconds, with an effective branching factor b~5, we can search a depth of ~[log(m) + log(k)] / log(b).
+        '''
         # XXX visited_states should only track a path?
         # print(depth, alpha, beta)
         board, turn, last_moved_piece = state
@@ -231,12 +231,14 @@ if __name__ == '__main__':
         black_player = MinimaxPlayer(
             'black',
             value_func=partial(first_order_adv, 'black', 200, 100, 20, 0),
-            rollout_order_gen=lambda x : x,
+            # The provided legal moves might be ordered differently
+            rollout_order_gen=lambda x : sorted(x),
             search_depth=4,
             seed=i)
         white_player = MinimaxPlayer('white', value_func=partial(material_value_adv, 'white', 2, 1), search_depth=4, seed=i * 2)
-        # white_player = RandomPlayer('white', seed=i * 2)
+        white_player = RandomPlayer('white', seed=i * 2)
         winner = play_a_game(ch, black_player.next_move, white_player.next_move, max_game_len)
+        # Play with a minimax player
         # play_a_game(ch, keyboard_player_move, white_player.next_move)
         print('black player evaluated %i positions in %.2fs (avg %.2f positions/s) effective branching factor %.2f' % (black_player.n_evaluated_positions, black_player.evaluation_dt, black_player.n_evaluated_positions / black_player.evaluation_dt, (black_player.n_evaluated_positions / black_player.ply) ** (1 / black_player.search_depth)))
         print('black player pruned', black_player.prunes.items())
