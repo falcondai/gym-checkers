@@ -31,6 +31,7 @@ class MinimaxPlayer(Player):
         self.rollout_order = rollout_order_gen or (lambda moves : self.random.permutation(np.asarray(moves, dtype='int,int')))
         # Cache the evaluated values
         # TODO transposition table
+        # TODO add endgame database
         self.cached_values = {}
         self.search_depth = search_depth
         self.ply = 0
@@ -94,16 +95,6 @@ class MinimaxPlayer(Player):
             # print(self.color == turn, depth, 'end', value, 'no more moves')
             self.n_evaluated_positions += 1
             return value, None
-
-        # # Loop checking for draws
-        # if im_state in visited_states:
-        #     # print(self.color == turn, depth, 'end', 0)
-        #     value = MinimaxPlayer.draw
-        #     self.add_to_cache(im_state, value)
-        #     self.n_evaluated_positions += 1
-        #     return value
-        # else:
-        #     visited_states.add(im_state)
 
         # Order moves based on ordering heuristic
         ordered_moves = self.rollout_order(moves)

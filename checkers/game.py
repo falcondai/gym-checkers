@@ -107,11 +107,13 @@ class Checkers:
     @staticmethod
     def immutable_board(board):
         # TODO Bitboard representation?
-        pieces = []
-        for player in Checkers.all_players:
-            for piece_type in Checkers.all_piece_types:
-                pieces.append(frozenset(board[player][piece_type]))
-        return tuple(pieces)
+        pieces = (
+            frozenset(board['black']['men']),
+            frozenset(board['black']['kings']),
+            frozenset(board['white']['men']),
+            frozenset(board['white']['kings']),
+        )
+        return pieces
 
     @staticmethod
     def board_equal(board1, board2):
