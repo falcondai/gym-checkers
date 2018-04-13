@@ -26,7 +26,7 @@ class MinimaxPlayer(Player):
 
         self.adversary = 'black' if self.color == 'white' else 'white'
         # Default to evaluate using material value heuristic
-        self.value = value_func or partial(material_value_adv, self.color, 1, 1)
+        self.value = value_func or partial(material_value_adv, self.color, 2, 1)
         # Default to evaluate actions at a random order
         self.rollout_order = rollout_order_gen or (lambda moves : self.random.permutation(np.asarray(moves, dtype='int,int')))
         # Cache the evaluated values
