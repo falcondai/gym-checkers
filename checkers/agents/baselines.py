@@ -46,8 +46,8 @@ def play_a_game(checkers, black_player_move, white_player_move, max_plies=float(
         tot_moves += len(moves)
         # The current game state
         checkers.print_board()
-        print(ply, turn, last_moved_piece)
-        print('legal moves', moves)
+        print(ply, 'turn:', turn, 'last_moved_piece:', last_moved_piece)
+        print('%i legal moves %r' % (len(moves), moves))
         # Select a legal move for the current player
         from_sq, to_sq = players[turn](board, last_moved_piece)
         print(turn, 'moved %i, %i' % (from_sq, to_sq))
@@ -58,7 +58,7 @@ def play_a_game(checkers, black_player_move, white_player_move, max_plies=float(
     if winner is None:
         print('draw')
     else:
-        print(winner, 'wins')
+        print('%s player wins' % winner)
     print('total legal moves', tot_moves, 'avg branching factor', tot_moves / ply)
     return winner
 

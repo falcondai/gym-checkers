@@ -16,9 +16,11 @@ from checkers.agents import Player
 class MctsPlayer(Player):
     '''
     Monte Carlo Tree Search player with upper confidence bound (UCB1)
-    reference: https://www.cs.swarthmore.edu/~bryce/cs63/s16/slides/2-17_extending_mcts.pdf
+    references:
+    https://www.cs.swarthmore.edu/~bryce/cs63/s16/slides/2-17_extending_mcts.pdf
+    _A Survey of Monte Carlo Tree Search Methods_ http://mcts.ai/pubs/mcts-survey-master.pdf
     '''
-    def __init__(self, color, exploration_coeff=1, max_rounds=800, max_plies=float('inf'), seed=None):
+    def __init__(self, color, exploration_coeff=1, max_rounds=800, max_plies=float('inf'), discount=0.99, seed=None):
         super(MctsPlayer, self).__init__(color=color, seed=seed)
 
         # Default policy for rollouts
@@ -29,6 +31,8 @@ class MctsPlayer(Player):
         self.max_rounds = max_rounds
         # Explore
         self.exploration_coeff = exploration_coeff
+        # Discount for the reward
+        self.discount = discount
 
         # Checkers can draw. Should keep the win counts separately for each player in general
         self.stats = defaultdict(lambda: (0, 0, 0))
@@ -64,51 +68,62 @@ class MctsPlayer(Player):
             # Start from the root
             st = st0
             walked_sts = [st]
-            # Follow Q for non-leaf nodes
-            while 0 < len(self.children[st]):
-                # In-tree, choose a successor according to statistics
-                if self.random.rand() < 0.1:
-                    # Explore randomly
+
+            # Selection
+            # XXX search could be stuck in a loop here (when are very possible successors left)
+            succ_sts = MctsPlayer.successor(st)
+            while 0 < len(succ_sts) and len(succ_sts) == len(self.children[st]):
+                # Not a terminal state and all children are expanded
+                # Use tree policy, choose a successor according to according to Q_hat + UCB
+                max_score = float('-inf')
+                max_st = None
+                turn = st[1]
+                for next_st in self.children[st]:
+                    # Upper confidence bound
+                    next_q = self.q(turn, next_st) + self.exploration_coeff * MctsPlayer.ucb(self.stats[st][-1], self.stats[next_st][-1])
+                    if max_score < next_q:
+                        max_score = next_q
+                        max_st = next_st
+                st = max_st
+                # Loop detection
+                if st in walked_sts:
                     break
-                else:
-                    # Select a visited successor state according to Q
-                    next_sts = list(self.children[st])
-                    max_q = float('-inf')
-                    next_idx = self.random.randint(len(next_sts))
-                    max_st = next_sts[next_idx]
-                    turn = st[1]
-                    for next_st in next_sts:
-                        # Upper confidence bound
-                        next_q = self.q(turn, next_st) + self.exploration_coeff * MctsPlayer.ucb(self.stats[st][-1], self.stats[next_st][-1])
-                        if max_q < next_q:
-                            max_q = next_q
-                            max_st = next_st
-                    st = max_st
                 # Add it to walked states in this round
                 walked_sts.append(st)
-            # Out-of-tree, choose a successor state randomly
-            next_sts = MctsPlayer.successor(st)
-            if 0 < len(next_sts):
-                next_idx = self.random.randint(len(next_sts))
-                next_st = next_sts[next_idx]
+                succ_sts = MctsPlayer.successor(st)
+
+            # Expansion
+            # Not an internal node, choose a successor state randomly
+            succ_sts = MctsPlayer.successor(st)
+            if 0 < len(succ_sts):
+                # Not a terminal state
+                next_idx = self.random.randint(len(succ_sts))
+                next_st = succ_sts[next_idx]
                 walked_sts.append(next_st)
                 # Add this node to the tree
                 self.children[st].add(next_st)
                 st = next_st
-            # Rollout till the game ends
-            winner = self.rollout(st)
-            # Update statistics on walked nodes
-            for st in walked_sts:
+
+            # Simulation
+            # Rollout till the game ends with a default policy
+            winner, ply = self.rollout(st)
+
+            # Back-propagation
+            # Update statistics on the walked nodes
+            reward = self.discount ** ply
+            for st in reversed(walked_sts):
                 black_wins, white_wins, n_samples = self.stats[st]
                 turn = st[1]
                 # Update wins based on the turn
-                black_wins += 1 if winner == 'black' else 0
-                white_wins += 1 if winner == 'white' else 0
+                black_wins += reward if winner == 'black' else 0
+                white_wins += reward if winner == 'white' else 0
                 self.stats[st] = black_wins, white_wins, n_samples + 1
+                # This reduces the influence of lucky rollouts due to very long random rollout
+                reward *= self.discount
             round += 1
 
         # Select a move after searching
-        print(len(self.children[st0]))
+        # print(len(self.children[st0]))
         sim = Checkers()
         state = MctsPlayer.convert_to_state(st0)
         sim.restore_state(state)
@@ -129,9 +144,11 @@ class MctsPlayer(Player):
                 if max_n < n_samples:
                     max_n = n_samples
                     max_n_move = move
-                print(move, '%.2f' % next_q, n_samples, next_st[1], self.stats[next_st], self.stats[next_st][0] + self.stats[next_st][1] - self.stats[next_st][-1])
-        print('%.2f' % self.q(self.color, st0))
-        print('leaves depth histogram (depth, count):', sorted(MctsPlayer.hist_leaf_depth(self.children, st0).items()))
+                # print(move, '%.2f' % next_q, n_samples, next_st[1], self.stats[next_st], self.stats[next_st][0] + self.stats[next_st][1] - self.stats[next_st][-1])
+        # Print some statistics
+        print('V_hat(player) - V_hat(opponent) = %.2f' % (self.q(self.color, st0) - self.q('white' if self.color == 'black' else 'black', st0)))
+        leaf_counts = MctsPlayer.hist_leaf_depth(self.children, st0)
+        print('leaf depth histogram (depth, count):', sorted(leaf_counts.items()), 'max depth', max(leaf_counts.keys()))
         return max_q_move
 
     @staticmethod
@@ -183,17 +200,18 @@ class MctsPlayer(Player):
         sim.restore_state(state)
         ply = 0
         moves = sim.legal_moves()
-        # Terminal state
+        # Check for a terminal state
         if len(moves) == 0:
+            # One player wins
             winner = 'white' if st[1] == 'black' else 'black'
         else:
             winner = None
         while ply < self.max_plies and winner is None:
-            from_sq, to_sq = self.rollout_policy(sorted(moves))
+            from_sq, to_sq = self.rollout_policy(moves)
             board, turn, last_moved_piece, moves, winner = sim.move(from_sq, to_sq, skip_check=True)
             ply += 1
         # Returns the winner or None in a draw
-        return winner
+        return winner, ply
 
     @staticmethod
     def ucb(n_parent_visits, n_visits):
@@ -203,13 +221,26 @@ class MctsPlayer(Player):
 if __name__ == '__main__':
     from checkers.agents.baselines import play_a_game, RandomPlayer
     from checkers.agents.alpha_beta import MinimaxPlayer
+
+    # End game
+    # _._._._.
+    # ._._._._
+    # _._._._.
+    # ._W_._._
+    # _._._._.
+    # ._._._._
+    # _._B_._.
+    # ._._._._
+    # bo = Checkers.empty_board()
+    # bo['black']['kings'].add(25)
+    # bo['white']['kings'].add(13)
+    # ch = Checkers(board=bo, turn='white', last_moved_piece=None)
     ch = Checkers()
     # black_player = RandomPlayer('black')
     black_player = MinimaxPlayer(
         color='black',
         # The provided legal moves might be ordered differently
-        rollout_order_gen=lambda x : sorted(x),
-        search_depth=3,
+        search_depth=5,
         seed=0,
         )
     white_player = MctsPlayer(
