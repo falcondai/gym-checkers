@@ -1,18 +1,16 @@
 # A few baseline players for Checkers including a keyboard player
 from __future__ import absolute_import, division, print_function
-from six.moves import range
-
-
-from functools import partial
 
 import numpy as np
 
 from checkers.game import Checkers
 from checkers.agents import Player
 
+
 # A random player
 class RandomPlayer(Player):
     '''A player that makes random legal moves.'''
+
     def next_move(self, board, last_moved_piece):
         state = (board, self.color, last_moved_piece)
         self.simulator.restore_state(state)
@@ -30,6 +28,7 @@ def keyboard_player_move(board, last_moved_piece):
         input_str = input('* move `%i, to_square`: ' % last_moved_piece)
     from_sq, to_sq = map(int, input_str.strip().split(','))
     return from_sq, to_sq
+
 
 def play_a_game(checkers, black_player_move, white_player_move, max_plies=float('inf')):
     # Play a quick game

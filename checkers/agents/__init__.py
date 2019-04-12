@@ -1,5 +1,4 @@
 from __future__ import absolute_import, division, print_function
-from six.moves import range
 
 
 import numpy as np
@@ -9,6 +8,7 @@ from checkers.game import Checkers
 
 class Player(object):
     '''An abstract player.'''
+
     def __init__(self, color, seed=None):
         assert color in Checkers.all_players, '`color` must be in %r.' % Checkers.all_players
 

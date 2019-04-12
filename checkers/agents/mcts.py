@@ -1,10 +1,7 @@
 # Monte Carlo tree search
 from __future__ import absolute_import, division, print_function
-from six.moves import range
 
-
-import time, copy, itertools
-from functools import partial
+import itertools
 from collections import defaultdict
 
 import numpy as np
@@ -20,6 +17,7 @@ class MctsPlayer(Player):
     https://www.cs.swarthmore.edu/~bryce/cs63/s16/slides/2-17_extending_mcts.pdf
     _A Survey of Monte Carlo Tree Search Methods_ http://mcts.ai/pubs/mcts-survey-master.pdf
     '''
+
     def __init__(self, color, exploration_coeff=1, max_rounds=800, max_plies=float('inf'), discount=0.99, seed=None):
         super(MctsPlayer, self).__init__(color=color, seed=seed)
 
@@ -36,7 +34,7 @@ class MctsPlayer(Player):
 
         # Checkers can draw. Should keep the win counts separately for each player in general
         self.stats = defaultdict(lambda: (0, 0, 0))
-        self.children = defaultdict(lambda : set())
+        self.children = defaultdict(lambda: set())
 
     def q(self, turn, st):
         # XXX compute Q for each player. Both try to maximize its own value
@@ -128,7 +126,9 @@ class MctsPlayer(Player):
         state = MctsPlayer.convert_to_state(st0)
         sim.restore_state(state)
         moves = sorted(sim.legal_moves())
+        # Q-maximizing move
         max_q, max_q_move = float('-inf'), None
+        # Visit-maximizing move
         max_n, max_n_move = float('-inf'), None
         for move in moves:
             sim.restore_state(state)
@@ -158,7 +158,7 @@ class MctsPlayer(Player):
     @staticmethod
     def hist_leaf_depth(children, root_st):
         '''Returns counts of leaves at different depths'''
-        counts = defaultdict(lambda : 0)
+        counts = defaultdict(lambda: 0)
         # Breadth first iteration
         queue = [(root_st, 0)]
         # XXX be careful with loops in a graph
@@ -218,8 +218,9 @@ class MctsPlayer(Player):
         '''Upper confidence bound (UCB1) based on Hoeffding inequality'''
         return np.sqrt(2 * np.log(n_parent_visits) / n_visits)
 
+
 if __name__ == '__main__':
-    from checkers.agents.baselines import play_a_game, RandomPlayer
+    from checkers.agents.baselines import play_a_game
     from checkers.agents.alpha_beta import MinimaxPlayer
 
     # End game

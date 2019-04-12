@@ -4,7 +4,8 @@ from __future__ import absolute_import, division, print_function
 from six.moves import range
 
 
-import itertools, copy
+import itertools
+import copy
 import numpy as np
 
 
@@ -156,7 +157,7 @@ class Checkers:
             assert False, 'A friendly piece must be moved.'
 
         # The move is a jump
-        if not to_sq in self.neighbors[from_sq]:
+        if to_sq not in self.neighbors[from_sq]:
             # Remove the captured piece
             to_row, to_col = self.sq2pos(to_sq)
             from_row, from_col = self.sq2pos(from_sq)
@@ -174,7 +175,7 @@ class Checkers:
             # Switch the turn, if there is no more jumps for the current player
             switch_turn = len(jumps) == 0
 
-        # Crowning a king
+        # Crowning a king (must end the turn)
         if piece_type == 'men':
             # Kings row is at the bottom for black
             if self._turn == 'black' and self.n_positions - to_sq <= self.n_per_row:
@@ -350,6 +351,7 @@ class Checkers:
         self._board = copy.deepcopy(board)
         self._turn = turn
         self._last_moved_piece = last_moved_piece
+
 
 if __name__ == '__main__':
     ch = Checkers(empty_corner=True)

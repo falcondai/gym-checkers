@@ -12,12 +12,14 @@ import numpy as np
 from checkers.game import Checkers
 from checkers.agents import Player
 
+
 class MinimaxPlayer(Player):
     '''Minimax search with alpha-beta pruning'''
     # TODO killer move heuristic
     # TODO history heuristic
     # The value of all the outcomes
     win, draw, loss = float('inf'), 0, float('-inf')
+
     def __init__(self, color, value_func=None, search_depth=float('inf'), rollout_order_gen=None, seed=None):
         super(MinimaxPlayer, self).__init__(color=color, seed=seed)
 
@@ -28,7 +30,7 @@ class MinimaxPlayer(Player):
         # Default to evaluate using material value heuristic
         self.value = value_func or partial(material_value_adv, self.color, 2, 1)
         # Default to evaluate actions at a random order
-        self.rollout_order = rollout_order_gen or (lambda moves : self.random.permutation(np.asarray(moves, dtype='int,int')))
+        self.rollout_order = rollout_order_gen or (lambda moves: self.random.permutation(np.asarray(moves, dtype='int,int')))
         # Cache the evaluated values
         # TODO transposition table
         # TODO add endgame database
@@ -39,7 +41,7 @@ class MinimaxPlayer(Player):
         # Statistics
         self.n_evaluated_positions = 0
         self.evaluation_dt = 0
-        self.prunes = defaultdict(lambda : 0)
+        self.prunes = defaultdict(lambda: 0)
 
     @staticmethod
     def immutable_state(board, turn, last_moved_piece):
@@ -158,9 +160,11 @@ def material_value(king_value, man_value, pieces):
     '''
     return man_value * len(pieces['men']) + king_value * len(pieces['kings'])
 
+
 def material_value_adv(color, king_value, man_value, board, turn, last_moved_piece):
     black_adv = material_value(king_value, man_value, board['black']) - material_value(king_value, man_value, board['white'])
-    return  black_adv if color == 'black' else -black_adv
+    return black_adv if color == 'black' else -black_adv
+
 
 def board_value(color, advance_bonus, safety_bonus, pieces):
     '''
@@ -192,12 +196,14 @@ def board_value(color, advance_bonus, safety_bonus, pieces):
                 value += safety_bonus
     return value
 
+
 def first_order_adv(color, king_value, man_value, advance_bonus, safety_bonus, board, turn, last_moved_piece):
-    black_adv = material_value(king_value, man_value, board['black']) \
-    + board_value('black', advance_bonus, safety_bonus, board['black']) \
-    - material_value(king_value, man_value, board['white']) \
-    - board_value('white', advance_bonus, safety_bonus, board['white'])
+    black_adv = material_value(king_value, man_value, board['black'])
+    black_adv += board_value('black', advance_bonus, safety_bonus, board['black'])
+    black_adv -= material_value(king_value, man_value, board['white'])
+    black_adv -= board_value('white', advance_bonus, safety_bonus, board['white'])
     return black_adv if color == 'black' else -black_adv
+
 
 def pair_value(color, board):
     '''
@@ -209,8 +215,10 @@ def pair_value(color, board):
     # TODO
     pass
 
+
 if __name__ == '__main__':
-    from checkers.agents.baselines import play_a_game, RandomPlayer, keyboard_player_move
+    from checkers.agents.baselines import play_a_game, RandomPlayer
+    # from checkers.agents.baselines import keyboard_player_move
 
     # A few matches against a random player
     max_game_len = 200
@@ -223,7 +231,7 @@ if __name__ == '__main__':
             'black',
             value_func=partial(first_order_adv, 'black', 200, 100, 20, 0),
             # The provided legal moves might be ordered differently
-            rollout_order_gen=lambda x : sorted(x),
+            rollout_order_gen=lambda x: sorted(x),
             search_depth=4,
             seed=i)
         white_player = MinimaxPlayer('white', value_func=partial(material_value_adv, 'white', 2, 1), search_depth=4, seed=i * 2)
@@ -236,6 +244,6 @@ if __name__ == '__main__':
         print()
         # Keep scores
         n_wins += 1 if winner == 'black' else 0
-        n_draws += 1 if winner == None else 0
+        n_draws += 1 if winner is None else 0
         n_losses += 1 if winner == 'white' else 0
     print('black win', n_wins, 'draw', n_draws, 'loss', n_losses)
